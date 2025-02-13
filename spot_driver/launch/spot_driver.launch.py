@@ -24,6 +24,9 @@ def launch_setup(context: LaunchContext, ld: LaunchDescription) -> None:
     tf_prefix = LaunchConfiguration("tf_prefix").perform(context)
     mock_enable = IfCondition(LaunchConfiguration("mock_enable", default="False")).evaluate(context)
     robot_description_package = LaunchConfiguration("robot_description_package").perform(context)
+    experimental_zenoh_rmw = IfCondition(LaunchConfiguration("experimental_zenoh_rmw", default="False")).evaluate(
+        context
+    )
 
     # if config_file has been set (and is not the default empty string) and is also not a file, do not launch anything.
     config_file_path = config_file.perform(context)
@@ -146,6 +149,10 @@ def launch_setup(context: LaunchContext, ld: LaunchDescription) -> None:
     )
     ld.add_action(spot_image_publishers)
 
+    if experimental_zenoh_rmw:
+        rmw_zenohd_node = Node(package="rmw_zenoh_cpp", executable="rmw_zenohd", name="rmw_zenohd", output="screen")
+        ld.add_action(rmw_zenohd_node)
+
 
 def generate_launch_description() -> LaunchDescription:
     launch_args = []
@@ -194,6 +201,14 @@ def generate_launch_description() -> LaunchDescription:
     )
     launch_args += declare_image_publisher_args()
     launch_args.append(DeclareLaunchArgument("spot_name", default_value="", description="Name of Spot"))
+
+    launch_args.append(
+        DeclareBooleanLaunchArgument(
+            "experimental_zenoh_rmw",
+            default_value=False,
+            description="Enable the experimental Zenoh RMW implementation. Requires build with rmw_zenoh package.",
+        )
+    )
 
     ld = LaunchDescription(launch_args)
 
