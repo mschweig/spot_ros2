@@ -46,19 +46,17 @@ RUN apt-get update -q && \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up workspace
-WORKDIR /ros_ws/src
-
-# Initialize rosdep
-RUN rosdep init && rosdep update
+WORKDIR /ros2_ws/src
 
 # Clone driver code
-RUN git clone https://github.com/bdaiinstitute/spot_ros2.git .
+RUN git clone https://github.com/bdaiinstitute/spot_ros2.git
+WORKDIR /ros2_ws/src/spot_ros2
 RUN git submodule update --init --recursive
 
 # Run install script and pass in the architecture
-RUN ARCH=$(dpkg --print-architecture) && echo "Building driver with $ARCH" && /ros_ws/src/install_spot_ros2.sh --$ARCH
+RUN ARCH=$(dpkg --print-architecture) && echo "Building driver with $ARCH" && /ros2_ws/src/spot_ros2/install_spot_ros2.sh --$ARCH
 
 # Build packages with Colcon
-WORKDIR /ros_ws/
+WORKDIR /ros2_ws
 RUN . /opt/ros/humble/setup.sh && \
     colcon build --symlink-install
