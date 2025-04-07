@@ -9,6 +9,6 @@ services:
     command: >
       bash -c "
         source /opt/ros/humble/setup.bash && 
-        source /ros_ws/install/setup.bash && 
+        source /ros2_ws/install/setup.bash && 
         ros2 launch spot_driver spot_driver.launch.py config_file:=/ros_ws/src/robot.yaml spot_name:=$${SPOT_NAME} launch_rviz:=False
       "
