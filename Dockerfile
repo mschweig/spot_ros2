@@ -48,6 +48,9 @@ RUN apt-get update -q && \
 # Set up workspace
 WORKDIR /ros2_ws/src
 
+#clone zenoh code
+RUN git clone https://github.com/ros2/rmw_zenoh.git -b humble
+
 # Clone driver code
 RUN git clone https://github.com/bdaiinstitute/spot_ros2.git
 WORKDIR /ros2_ws/src/spot_ros2
@@ -58,5 +61,5 @@ RUN ARCH=$(dpkg --print-architecture) && echo "Building driver with $ARCH" && /r
 
 # Build packages with Colcon
 WORKDIR /ros2_ws
-RUN . /opt/ros/humble/setup.sh && \
-    colcon build --symlink-install
+RUN . /opt/ros/humble/setup.bash && rosdep install --from-paths ./ --ignore-src -y -r --rosdistro=humble && \
+    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
