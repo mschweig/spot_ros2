@@ -1,9 +1,6 @@
 # Use official Ubuntu 22.04 base image
 FROM ubuntu:22.04
 
-#RMW ZENOH experimental flag
-ARG EXPERIMENTAL_ZENOH_RMW=FALSE
-
 # Set noninteractive mode for APT
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -41,12 +38,13 @@ RUN apt-get update -q && \
     python3-tk \
     ros-humble-ros-base \
     ros-dev-tools \
-    #check if Zenoh should be installed
-    $(if [ "$EXPERIMENTAL_ZENOH_RMW" = "TRUE" ]; then echo "ros-humble-rmw-zenoh-cpp"; fi) \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up workspace
 WORKDIR /ros2_ws/src
+
+# Initialize rosdep
+RUN rosdep init && rosdep update && apt-get update
 
 #clone zenoh code
 RUN git clone https://github.com/ros2/rmw_zenoh.git -b humble
@@ -61,5 +59,5 @@ RUN ARCH=$(dpkg --print-architecture) && echo "Building driver with $ARCH" && /r
 
 # Build packages with Colcon
 WORKDIR /ros2_ws
-RUN . /opt/ros/humble/setup.bash && rosdep install --from-paths ./ --ignore-src -y -r --rosdistro=humble && \
-    colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
+RUN rosdep install --from-paths src --ignore-src -y --rosdistro=humble
+RUN source /opt/ros/humble/setup.bash && colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release
