@@ -11,6 +11,8 @@
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <geometry_msgs/msg/vector3.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -168,7 +170,7 @@ tl::expected<GetImagesResult, std::string> DefaultImageClient::getImages(::bosdy
   for (const auto& image_response : get_image_result.response.image_responses()) {
     const auto& image = image_response.shot().image();
     auto data = image.data();
-
+    
     const auto info_msg = toCameraInfoMsg(image_response, frame_prefix_, clock_skew_result.value());
     if (!info_msg) {
       return tl::make_unexpected("Failed to convert SDK image response to ROS CameraInfo message: " + info_msg.error());
@@ -197,7 +199,41 @@ tl::expected<GetImagesResult, std::string> DefaultImageClient::getImages(::bosdy
       if (!image_msg) {
         return tl::make_unexpected("Failed to convert SDK image response to ROS Image message: " + image_msg.error());
       }
-      out.images_.try_emplace(get_source_name_result.value(), ImageWithCameraInfo{image_msg.value(), info_msg.value()});
+
+      // Check the encoding of the image
+      std::string encoding = image_msg.value().encoding;
+      cv::Mat decoded_image;
+
+      if (encoding == sensor_msgs::image_encodings::TYPE_16UC1) {
+        // Handle 16UC1 (depth image)
+        decoded_image = cv_bridge::toCvCopy(image_msg.value(), sensor_msgs::image_encodings::TYPE_16UC1)->image;
+      } else if (encoding == sensor_msgs::image_encodings::BGR8 || encoding == sensor_msgs::image_encodings::RGB8) {
+        // Handle color images
+        decoded_image = cv_bridge::toCvCopy(image_msg.value(), sensor_msgs::image_encodings::BGR8)->image;
+      } else {
+        return tl::make_unexpected("Unsupported image encoding: " + encoding);
+      }
+
+      // Get the camera name and determine if it needs rotation
+      cv::Mat rotated_image;
+
+      if (camera_name == "frontleft_fisheye_image" || camera_name == "frontright_fisheye_image") {
+        // Rotate by 90 degrees (CW)
+        cv::rotate(decoded_image, rotated_image, cv::ROTATE_90_CLOCKWISE);
+      } else if (camera_name == "right_fisheye_image") {
+        // Rotate by right image 180 degrees
+        cv::rotate(decoded_image, rotated_image, cv::ROTATE_180);
+      }
+      else {
+        // No rotation needed
+        rotated_image = decoded_image;
+      }
+
+      // Convert the rotated image back to a ROS Image message
+      sensor_msgs::msg::Image rotated_image_msg;
+      cv_bridge::CvImage(image_msg.value().header, encoding, rotated_image).toImageMsg(rotated_image_msg);
+
+      out.images_.try_emplace(get_source_name_result.value(), ImageWithCameraInfo{rotated_image_msg, info_msg.value()});
     }
 
     const auto transforms_result = getImageTransforms(image_response, frame_prefix_, clock_skew_result.value());
